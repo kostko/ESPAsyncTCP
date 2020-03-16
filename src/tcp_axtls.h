@@ -71,9 +71,7 @@ int tcp_ssl_is_server(struct tcp_pcb *tcp);
 int tcp_ssl_free(struct tcp_pcb *tcp);
 int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p);
 
-#ifdef AXTLS_2_0_0_SNDBUF
-int tcp_ssl_sndbuf(struct tcp_pcb *tcp);
-#endif
+int tcp_ssl_calculate_write_length(struct tcp_pcb *tcp, size_t len);
 
 int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len);
 

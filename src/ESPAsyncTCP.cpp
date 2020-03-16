@@ -390,14 +390,31 @@ size_t AsyncClient::write(const char* data, size_t size, uint8_t apiflags) {
   return will_send;
 }
 
+size_t AsyncClient::messageLength(size_t size) {
+#if ASYNC_TCP_SSL_ENABLED
+  if(_pcb_secure) {
+    int result = tcp_ssl_calculate_write_length(_pcb, size);
+    if (result < 0) {
+      return 0;
+    }
+    return (size_t) result;
+  }
+#endif
+
+  return size;
+}
+
 size_t AsyncClient::add(const char* data, size_t size, uint8_t apiflags) {
-  if(!_pcb || size == 0 || data == NULL)
+  if(!_pcb || size == 0 || data == NULL) {
+    ASYNC_TCP_DEBUG("add(): no data (%d, %x)\r\n", size, data);
     return 0;
-  size_t room = space();
-  if(!room)
-    return 0;
+  }
 #if ASYNC_TCP_SSL_ENABLED
   if(_pcb_secure){
+    if (!spaceRaw()) {
+      ASYNC_TCP_DEBUG("add(): no space\r\n");
+      return 0;
+    }
     int sent = tcp_ssl_write(_pcb, (uint8_t*)data, size);
     if(sent >= 0){
       _tx_unacked_len += sent;
@@ -407,6 +424,11 @@ size_t AsyncClient::add(const char* data, size_t size, uint8_t apiflags) {
     return 0;
   }
 #endif
+  size_t room = space();
+  if(!room) {
+    ASYNC_TCP_DEBUG("add(): no space\r\n");
+    return 0;
+  }
   size_t will_send = (room < size) ? room : size;
   err_t err = tcp_write(_pcb, data, will_send, apiflags);
   if(err != ERR_OK) {
@@ -983,19 +1005,27 @@ void AsyncClient::onPoll(AcConnectHandler cb, void* arg){
   _poll_cb_arg = arg;
 }
 
+size_t AsyncClient::spaceRaw() {
+#if ASYNC_TCP_SSL_ENABLED
+  if ((_pcb != NULL) && (_pcb->state == 4) && _handshake_done) {
+    return tcp_sndbuf(_pcb);
+  }
+#else
+  if ((_pcb != NULL) && (_pcb->state == 4)){
+    return tcp_sndbuf(_pcb);
+  }
+#endif
+  return 0;
+}
 
 size_t AsyncClient::space(){
 #if ASYNC_TCP_SSL_ENABLED
   if((_pcb != NULL) && (_pcb->state == 4) && _handshake_done){
     uint16_t s = tcp_sndbuf(_pcb);
     if(_pcb_secure){
-#ifdef AXTLS_2_0_0_SNDBUF
-      return tcp_ssl_sndbuf(_pcb);
-#else
       if(s >= 128) //safe approach
         return s - 128;
       return 0;
-#endif
     }
     return s;
   }

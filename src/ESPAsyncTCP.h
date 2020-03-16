@@ -209,6 +209,8 @@ class AsyncClient {
 
     bool canSend();//ack is not pending
     size_t space();
+    size_t spaceRaw();
+    size_t messageLength(size_t size);
     size_t add(const char* data, size_t size, uint8_t apiflags=0);//add for sending
     bool send();//send all data added with the method above
     size_t ack(size_t len); //ack data that you have not acked using the method below

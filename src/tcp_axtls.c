@@ -285,38 +285,15 @@ int tcp_ssl_free(struct tcp_pcb *tcp) {
   return 0;
 }
 
-#ifdef AXTLS_2_0_0_SNDBUF
-int tcp_ssl_sndbuf(struct tcp_pcb *tcp){
-  int expected;
-  int available;
-  int result = -1;
-
-  if(tcp == NULL) {
-    return result;
-  }
-  tcp_ssl_t * tcp_ssl = tcp_ssl_get(tcp);
+int tcp_ssl_calculate_write_length(struct tcp_pcb *tcp, size_t len) {
+  tcp_ssl_t *tcp_ssl = tcp_ssl_get(tcp);
   if(!tcp_ssl){
-    TCP_SSL_DEBUG("tcp_ssl_sndbuf: tcp_ssl is NULL\n");
-    return result;
-  }
-  available = tcp_sndbuf(tcp);
-  if(!available){
-    TCP_SSL_DEBUG("tcp_ssl_sndbuf: tcp_sndbuf is zero\n");
-    return 0;
-  }
-  result = available;
-  while((expected = ssl_calculate_write_length(tcp_ssl->ssl, result)) > available){
-    result -= (expected - available) + 4;
+    TCP_SSL_DEBUG("tcp_ssl_calculate_write_length: tcp_ssl is NULL\n");
+    return -1;
   }
 
-  if(expected > 0){
-    //TCP_SSL_DEBUG("tcp_ssl_sndbuf: tcp_sndbuf is %d from %d\n", result, available);
-    return result;
-  }
-
-  return 0;
+  return ssl_calculate_write_length(tcp_ssl->ssl, len);
 }
-#endif
 
 int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len) {
   if(tcp == NULL) {
@@ -329,14 +306,12 @@ int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len) {
   }
   tcp_ssl->last_wr = 0;
 
-#ifdef AXTLS_2_0_0_SNDBUF
   int expected_len = ssl_calculate_write_length(tcp_ssl->ssl, len);
   int available_len = tcp_sndbuf(tcp);
   if(expected_len < 0 || expected_len > available_len){
     TCP_SSL_DEBUG("tcp_ssl_write: data will not fit! %u < %d(%u)\r\n", available_len, expected_len, len);
     return -1;
   }
-#endif
 
   int rc = ssl_write(tcp_ssl->ssl, data, len);
 
